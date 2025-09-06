@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF--8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Biology Lab Booking</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+      body {
+        font-family: 'Inter', sans-serif;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@18.3.1",
+    "react-dom/client": "https://esm.sh/react-dom@18.3.1/client",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.1.1/",
+    "react/": "https://aistudiocdn.com/react@^19.1.1/"
+  }
+}
+</script>
+  <!-- Babel to transpile JSX in the browser -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body>
+    <div id="root"></div>
+    <script type="text/babel" data-type="module">
+// Polyfill for process.env
+const process = { env: { API_KEY: '' } };
+
+// All TSX/JS code will be placed here.
+// The data-type="module" allows using import/export syntax.
+
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import ReactDOM from 'react-dom/client';
+
+// --- START OF types.ts ---
+const ModalType = {
+    BOOKING: 'BOOKING',
+    DAY_DETAILS: 'DAY_DETAILS',
+};
+// --- END OF types.ts ---
+
+// --- START OF constants.ts ---
+const SCHOOL_YEAR_START = new Date('2025-09-01');
+const SCHOOL_YEAR_END = new Date('2026-06-30');
+
+const TIME_SLOTS = [
+    { id: 1, name: "1ª Hora", time: "08:15 - 09:10" },
+    { id: 2, name: "2ª Hora", time: "09:10 - 10:05" },
+    { id: 3, name: "3ª Hora", time: "10:05 - 11:00" },
+    { id: 4, name: "4ª Hora", time: "11:30 - 12:25" },
+    { id: 5, name: "5ª Hora", time: "12:25 - 13:20" },
+    { id: 6, name: "6ª Hora", time: "13:20 - 14:15" },
+];
+
+const HOLIDAYS_LIST = [
+    '2025-10-12', '2025-11-01', '2025-12-06', '2025-12-08', '2026-01-01', '2026-01-06',
+    '2026-04-10', '2026-05-01', '2025-09-16', '2026-04-07', '2026-06-09', '2025-12-09', '2026-03-19'
+];
+const HOLIDAY_RANGES = [
+    { start: '2025-12-23', end: '2026-01-05' },
+    { start: '2026-04-03', end: '2026-04-13' }
+];
+const generateDateRange = (start, end) => {
+    const dates = new Set();
+    let currentDate = new Date(start + 'T00:00:00');
+    const endDate = new Date(end + 'T00:00:00');
+    while (currentDate <= endDate) {
+        dates.add(currentDate.toISOString().split('T')[0]);
+        currentDate.setDate(currentDate.getDate() + 1);
+    }
+    return dates;
+};
+const holidays = new Set(HOLIDAYS_LIST);
+HOLIDAY_RANGES.forEach(range => {
+    const datesInRange = generateDateRange(range.start, range.end);
+    datesInRange.forEach(date => holidays.add(date));
+});
+const HOLIDAYS = holidays;
+// --- END OF constants.ts ---
+
+// --- START OF components/icons.tsx ---
+const HeaderIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-indigo-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path>
+    <polyline points="14 2 14 8 20 8"></polyline>
+    <path d="M12 18h.01"></path>
+    <path d="M16 14h.01"></path>
+    <path d="M8 14h.01"></path>
+  </svg>
+);
+const InfoIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+    </svg>
+);
+const ChevronLeftIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+    </svg>
+);
+const ChevronRightIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+    </svg>
+);
+const CloseIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+  </svg>
+);
+const SaveIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+        <path d="M7.707 10.293a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L11 11.586V6a1 1 0 10-2 0v5.586L7.707 10.293zM17 3a1 1 0 011 1v12a1 1 0 01-1 1H3a1 1 0 01-1-1V4a1 1 0 011-1h2a1 1 0 011 1v1h8V4a1 1 0 011-1h2z" />
+    </svg>
+);
+const EditIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+        <path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" />
+        <path fillRule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clipRule="evenodd" />
+    </svg>
+);
+const PlusIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+        <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+    </svg>
+);
+const TrashIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+        <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
+    </svg>
+);
+// --- END OF components/icons.tsx ---
+
+// --- START OF components/Calendar.tsx ---
+const Calendar = ({ currentDate, bookings, onPrevMonth, onNextMonth, onOpenModal }) => {
+    const month = currentDate.getMonth();
+    const year = currentDate.getFullYear();
+    
+    const firstDayOfMonth = new Date(year, month, 1).getDay();
+    const startDay = (firstDayOfMonth === 0) ? 6 : firstDayOfMonth - 1; 
+
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    const monthName = currentDate.toLocaleString('es-ES', { month: 'long' });
+    const yearName = currentDate.getFullYear();
+
+    const renderDays = () => {
+        const days = [];
+        for (let i = 0; i < startDay; i++) {
+            days.push(<div key={`empty-${i}`} className="border-r border-b border-gray-200"></div>);
+        }
+
+        for (let i = 1; i <= daysInMonth; i++) {
+            const dayDate = new Date(Date.UTC(year, month, i));
+            const dateStr = dayDate.toISOString().split('T')[0];
+            const dayOfWeek = dayDate.getUTCDay();
+
+            const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+            const isHoliday = HOLIDAYS.has(dateStr);
+            
+            const comparisonDate = new Date(dateStr + 'T00:00:00Z');
+            const isOutsideSchoolYear = comparisonDate < SCHOOL_YEAR_START || comparisonDate > SCHOOL_YEAR_END;
+
+            const isNonSchoolDay = isWeekend || isHoliday || isOutsideSchoolYear;
+            
+            const dayBookings = bookings[dateStr] || [];
+            const bookedCount = dayBookings.filter(b => b !== null).length;
+
+            const cellClasses = [
+                "relative p-2 border-r border-b border-gray-200 flex flex-col justify-between h-28 sm:h-32",
+                isNonSchoolDay ? "bg-gray-100 text-gray-400" : "cursor-pointer hover:bg-indigo-50 transition-colors duration-200",
+            ].join(' ');
+
+            days.push(
+                <div 
+                    key={dateStr} 
+                    className={cellClasses}
+                    onClick={() => !isNonSchoolDay && onOpenModal(ModalType.DAY_DETAILS, { date: dateStr })}
+                >
+                    <span className="font-medium text-sm sm:text-base">{i}</span>
+                    {!isNonSchoolDay && bookedCount > 0 && (
+                        <div className="text-xs sm:text-sm text-center self-center">
+                            <span className={`font-bold py-1 px-2 rounded-full ${bookedCount === TIME_SLOTS.length ? 'bg-red-200 text-red-800' : 'bg-green-200 text-green-800'}`}>
+                                {bookedCount}/{TIME_SLOTS.length}
+                            </span>
+                            <span className="block mt-1">reservadas</span>
+                        </div>
+                    )}
+                     {!isNonSchoolDay && bookedCount === 0 && (
+                        <div className="text-xs sm:text-sm text-center self-center text-gray-400">
+                            Disponible
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        return days;
+    };
+
+    return (
+        <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6">
+            <div className="flex justify-between items-center mb-4">
+                <button onClick={onPrevMonth} className="p-2 rounded-full hover:bg-gray-200 transition-colors">
+                    <ChevronLeftIcon />
+                </button>
+                <h2 className="text-xl sm:text-2xl font-bold capitalize text-gray-700">{monthName} {yearName}</h2>
+                <button onClick={onNextMonth} className="p-2 rounded-full hover:bg-gray-200 transition-colors">
+                    <ChevronRightIcon />
+                </button>
+            </div>
+            <div className="grid grid-cols-7 text-center font-semibold text-sm text-gray-600 mb-2">
+                <div>Lunes</div>
+                <div>Martes</div>
+                <div>Miércoles</div>
+                <div>Jueves</div>
+                <div>Viernes</div>
+                <div>Sábado</div>
+                <div>Domingo</div>
+            </div>
+            <div className="grid grid-cols-7 border-t border-l border-gray-200">
+                {renderDays()}
+            </div>
+        </div>
+    );
+};
+// --- END OF components/Calendar.tsx ---
+
+// --- START OF components/BookingModal.tsx ---
+const BookingModal = ({ isOpen, onClose, onSave, bookingData, date, timeSlot }) => {
+    const [professorName, setProfessorName] = useState('');
+    const [className, setClassName] = useState('');
+    const [practiceName, setPracticeName] = useState('');
+
+    useEffect(() => {
+        if (bookingData) {
+            setProfessorName(bookingData.professorName);
+            setClassName(bookingData.className);
+            setPracticeName(bookingData.practiceName);
+        } else {
+            setProfessorName('');
+            setClassName('');
+            setPracticeName('');
+        }
+    }, [bookingData]);
+
+    if (!isOpen) return null;
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        const newBooking = {
+            id: bookingData?.id || new Date().toISOString(),
+            date,
+            timeSlotId: timeSlot.id,
+            professorName,
+            className,
+            practiceName,
+        };
+        onSave(newBooking);
+    };
+    
+    const formattedDate = new Date(date).toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
+                <div className="p-6 border-b border-gray-200 flex justify-between items-center">
+                    <div>
+                        <h3 className="text-xl font-bold text-gray-800">{bookingData ? 'Editar Reserva' : 'Nueva Reserva'}</h3>
+                        <p className="text-sm text-gray-500 capitalize">{formattedDate} &middot; {timeSlot.name} ({timeSlot.time})</p>
+                    </div>
+                    <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-200 transition-colors">
+                        <CloseIcon />
+                    </button>
+                </div>
+                <form onSubmit={handleSubmit}>
+                    <div className="p-6 space-y-4">
+                        <div>
+                            <label htmlFor="professorName" className="block text-sm font-medium text-gray-700 mb-1">Nombre del Profesor</label>
+                            <input
+                                type="text"
+                                id="professorName"
+                                value={professorName}
+                                onChange={(e) => setProfessorName(e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+                            />
+                        </div>
+                        <div>
+                            <label htmlFor="className" className="block text-sm font-medium text-gray-700 mb-1">Clase/Grupo</label>
+                            <input
+                                type="text"
+                                id="className"
+                                value={className}
+                                onChange={(e) => setClassName(e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+                            />
+                        </div>
+                        <div>
+                            <label htmlFor="practiceName" className="block text-sm font-medium text-gray-700 mb-1">Nombre de la Práctica</label>
+                            <input
+                                type="text"
+                                id="practiceName"
+                                value={practiceName}
+                                onChange={(e) => setPracticeName(e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+                            />
+                        </div>
+                    </div>
+                    <div className="px-6 pb-4">
+                         <p className="text-xs text-gray-500">
+                            Para eliminar una reserva, deje todos los campos en blanco y guarde los cambios.
+                        </p>
+                    </div>
+                    <div className="p-6 bg-gray-50 rounded-b-lg flex justify-end items-center">
+                        <button
+                            type="submit"
+                            className="flex items-center space-x-2 px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors"
+                        >
+                            <SaveIcon />
+                            <span>{bookingData ? 'Guardar Cambios' : 'Crear Reserva'}</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+};
+// --- END OF components/BookingModal.tsx ---
+
+// --- START OF components/DayDetailModal.tsx ---
+const DayDetailModal = ({ isOpen, onClose, date, bookings, onBookSlot, onEditBooking }) => {
+    if (!isOpen) return null;
+    
+    const formattedDate = new Date(date).toLocaleDateString('es-ES', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-40 p-4">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl">
+                <div className="p-5 border-b border-gray-200 flex justify-between items-center">
+                    <div>
+                        <h3 className="text-xl font-bold text-gray-800">Reservas del Día</h3>
+                        <p className="text-sm text-gray-500 capitalize">{formattedDate}</p>
+                    </div>
+                    <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-200 transition-colors">
+                        <CloseIcon />
+                    </button>
+                </div>
+                <div className="p-6 max-h-[60vh] overflow-y-auto">
+                    <ul className="space-y-3">
+                        {TIME_SLOTS.map((slot, index) => {
+                            const booking = bookings[index];
+                            return (
+                                <li key={slot.id} className="p-4 border border-gray-200 rounded-lg flex items-center justify-between">
+                                    <div className="flex items-center">
+                                        <div className="w-28 sm:w-32">
+                                            <p className="font-bold text-gray-700">{slot.name}</p>
+                                            <p className="text-sm text-gray-500">{slot.time}</p>
+                                        </div>
+                                        {booking ? (
+                                            <div className="border-l border-gray-300 pl-4 ml-4">
+                                                <p className="font-semibold text-indigo-700">{booking.practiceName}</p>
+                                                <p className="text-sm text-gray-600">
+                                                    <span className="font-medium">Prof:</span> {booking.professorName} | <span className="font-medium">Clase:</span> {booking.className}
+                                                </p>
+                                            </div>
+                                        ) : (
+                                            <div className="border-l border-gray-300 pl-4 ml-4">
+                                                <p className="text-gray-400 italic">Hora disponible</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                    {booking ? (
+                                        <button onClick={() => onEditBooking(booking)} className="flex items-center space-x-2 text-sm px-3 py-1.5 bg-yellow-100 text-yellow-800 rounded-md hover:bg-yellow-200 transition-colors">
+                                            <EditIcon />
+                                            <span>Editar</span>
+                                        </button>
+                                    ) : (
+                                        <button onClick={() => onBookSlot(slot)} className="flex items-center space-x-2 text-sm px-3 py-1.5 bg-green-100 text-green-800 rounded-md hover:bg-green-200 transition-colors">
+                                            <PlusIcon />
+                                            <span>Reservar</span>
+                                        </button>
+                                    )}
+                                </li>
+                            );
+                        })}
+                    </ul>
+                </div>
+                 <div className="p-4 bg-gray-50 rounded-b-lg text-right">
+                    <button onClick={onClose} className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 transition-colors">
+                        Cerrar
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+// --- END OF components/DayDetailModal.tsx ---
+
+// --- START OF App.tsx ---
+
+// ==============================================================================
+// URL de la aplicación web de Google Apps Script.
+// ==============================================================================
+const GOOGLE_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzmlEk_1S4KqCqx0OL7ABavT-J5jAR0QxI9Gy-vjpdM7nlq31b9DAMJGvy60tKuyqjq/exec';
+
+
+const App = () => {
+    const [currentDate, setCurrentDate] = useState(SCHOOL_YEAR_START);
+    const [bookings, setBookings] = useState({});
+    const [modalState, setModalState] = useState({ type: null, data: null });
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [notification, setNotification] = useState(null); // { message: string, type: 'success' | 'error' }
+
+    useEffect(() => {
+        const fetchBookings = async () => {
+            setIsLoading(true);
+            setError(null);
+            
+            try {
+                const response = await fetch(GOOGLE_APPS_SCRIPT_URL);
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    let parsedError = {};
+                    try {
+                        parsedError = JSON.parse(errorText);
+                    } catch (e) { /* no es json */ }
+
+                    if (parsedError.message && parsedError.message.includes("ID de la hoja de cálculo no ha sido configurado")) {
+                        throw new Error("Error de Configuración en Apps Script: Aún no has introducido el ID de tu hoja de cálculo en el archivo Code.gs.");
+                    }
+                    if (parsedError.message && parsedError.message.includes("No se pudo abrir la hoja de cálculo")) {
+                         throw new Error("Error de Configuración en Apps Script: El ID de la hoja de cálculo es incorrecto o no tienes permisos. Verifica el ID en el archivo Code.gs.");
+                    }
+
+                    throw new Error(`Error de red: ${response.status} ${response.statusText}`);
+                }
+                const contentType = response.headers.get("content-type");
+                if (!contentType || !contentType.includes("application/json")) {
+                     throw new Error("La respuesta del servidor no es JSON. Revisa la URL y la configuración de permisos del script.");
+                }
+                
+                const data = await response.json();
+                
+                const bookingsByDate = {};
+                data.forEach(booking => {
+                    if (!bookingsByDate[booking.date]) {
+                        bookingsByDate[booking.date] = Array(TIME_SLOTS.length).fill(null);
+                    }
+                    const slotIndex = TIME_SLOTS.findIndex(slot => slot.id === Number(booking.timeSlotId));
+                    if (slotIndex !== -1) {
+                        bookingsByDate[booking.date][slotIndex] = booking;
+                    }
+                });
+                setBookings(bookingsByDate);
+
+            } catch (err) {
+                console.error("Error fetching bookings:", err);
+                if (err instanceof TypeError || err.message.includes('Failed to fetch')) { // Catch CORS/network errors
+                    setError(
+                        `Error de Conexión o Permisos: No se pudo cargar los datos.
+
+                        **Causa #1: Error de Permisos (Muy Común)**
+                        Si otros usuarios (o tú en modo incógnito) ven un error '404' o una página de error de Google, el problema está en la configuración de tu script.
+
+                        **Pasos para solucionarlo:**
+                        1. Abre tu Hoja de Cálculo y ve a **Extensiones > Apps Script**.
+                        2. Haz clic en el botón azul **"Implementar"** y luego en **"Gestionar implementaciones"**.
+                        3. Busca tu implementación activa, haz clic en el icono del lápiz (✏️) para editarla.
+                        4. En la configuración de **"¿Quién tiene acceso?"**, asegúrate de seleccionar **"Cualquier usuario"**.
+                        5. Haz clic en **"Implementar"**.
+
+                        **Causa #2: URL Incorrecta**
+                        Verifica que la URL en el código es la correcta y que no hay errores en tu Apps Script.`
+                    );
+                } else {
+                    setError(err.message || "No se pudieron cargar las reservas.");
+                }
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        fetchBookings();
+    }, []);
+
+    const handlePreviousMonth = () => {
+        setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
+    };
+
+    const handleNextMonth = () => {
+        setCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
+    };
+
+    const handleOpenModal = useCallback((type, data) => {
+        setModalState({ type, data });
+    }, []);
+
+    const handleCloseModal = () => {
+        setModalState({ type: null, data: null });
+    };
+
+    const showNotification = (message, type) => {
+        setNotification({ message, type });
+        setTimeout(() => setNotification(null), 5000);
+    };
+
+    const handleSaveBooking = async (booking) => {
+    const { date, professorName, className, practiceName } = booking;
+    const isEmpty = !professorName.trim() && !className.trim() && !practiceName.trim();
+    const action = isEmpty ? 'delete' : 'save';
+
+    const isEditingExistingBooking = !!modalState.data.booking;
+    if (!isEditingExistingBooking && isEmpty) {
+        setModalState({ type: ModalType.DAY_DETAILS, data: { date } });
+        return;
+    }
+
+    const originalBookings = { ...bookings };
+
+    setBookings(prev => {
+        const newBookings = { ...prev };
+        const dayBookings = newBookings[date] ? [...newBookings[date]] : Array(TIME_SLOTS.length).fill(null);
+        const slotIndex = TIME_SLOTS.findIndex(slot => slot.id === booking.timeSlotId);
+
+        if (slotIndex === -1) return prev;
+
+        dayBookings[slotIndex] = isEmpty ? null : booking;
+
+        if (dayBookings.every(b => b === null)) {
+            delete newBookings[date];
+        } else {
+            newBookings[date] = dayBookings;
+        }
+
+        return newBookings;
+    });
+
+    setModalState({ type: ModalType.DAY_DETAILS, data: { date } });
+
+    try {
+        // Prepara el cuerpo de la solicitud como un objeto JavaScript.
+        const requestBody = {
+            action: action,
+            payload: booking 
+        };
+
+        // Envía la solicitud como una cadena de texto JSON.
+        const response = await fetch(GOOGLE_APPS_SCRIPT_URL, {
+            method: 'POST',
+            // Apps Script procesará esto correctamente con e.postData.contents.
+            body: JSON.stringify(requestBody),
+            // Opcional pero buena práctica, aunque Apps Script no lo requiere.
+            headers: {
+                'Content-Type': 'text/plain;charset=utf-8', 
+            },
+        });
+
+        if (!response.ok) {
+             const errorText = await response.text();
+             let errorMessage = errorText;
+             try {
+                 // Intenta parsear por si el script devolvió un error JSON
+                 const errorJson = JSON.parse(errorText);
+                 errorMessage = errorJson.message || 'Error al procesar la solicitud.';
+             } catch (e) {
+                 // No es JSON, usa el texto del error directamente
+             }
+             throw new Error(errorMessage);
+        }
+
+        showNotification(isEmpty ? 'Reserva eliminada con éxito.' : 'Reserva guardada con éxito.', 'success');
+    } catch (err) {
+        console.error(`Error ${action} booking:`, err);
+        showNotification(`Error al ${isEmpty ? 'eliminar' : 'guardar'}. Los cambios se han revertido. Detalles: ${err.message}`, 'error');
+        setBookings(originalBookings);
+    }
+};
+    
+    const selectedDayBookings = useMemo(() => {
+        if (modalState.type === ModalType.DAY_DETAILS && modalState.data?.date) {
+            return bookings[modalState.data.date] || Array(TIME_SLOTS.length).fill(null);
+        }
+        return [];
+    }, [modalState, bookings]);
+
+    return (
+        <>
+            {notification && (
+                <div className={`fixed top-5 right-5 z-[100] p-4 rounded-md shadow-lg text-white transition-opacity duration-300 ${notification.type === 'success' ? 'bg-green-600' : 'bg-red-600'}`}>
+                    {notification.message}
+                </div>
+            )}
+            <div className="bg-gray-50 min-h-screen text-gray-800">
+                <header className="bg-white shadow-md p-4 flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                        <HeaderIcon />
+                        <h1 className="text-2xl font-bold text-gray-700">Reserva del Laboratorio de Biología</h1>
+                    </div>
+                     <span className="text-lg font-semibold text-indigo-600">Curso 2025-2026</span>
+                </header>
+
+                <main className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
+                     <div className="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 rounded-md mb-6 flex items-start space-x-3">
+                        <div className="pt-0.5"><InfoIcon /></div>
+                        <div>
+                            <p className="font-bold">Almacenamiento de Datos</p>
+                            <p className="text-sm">
+                                Las reservas se guardan y se leen directamente desde una hoja de cálculo en Google Drive, asegurando que los datos estén siempre actualizados y respaldados.
+                            </p>
+                        </div>
+                    </div>
+
+                    {error && (
+                         <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded-md mb-6" role="alert">
+                            <p className="font-bold">Error</p>
+                            <p className="whitespace-pre-wrap">{error}</p>
+                        </div>
+                    )}
+
+                    {isLoading ? (
+                        <div className="text-center py-10">
+                            <p className="text-lg text-gray-600">Cargando reservas desde Google Drive...</p>
+                        </div>
+                    ) : (
+                        <Calendar 
+                            currentDate={currentDate}
+                            bookings={bookings}
+                            onPrevMonth={handlePreviousMonth}
+                            onNextMonth={handleNextMonth}
+                            onOpenModal={handleOpenModal}
+                        />
+                    )}
+                </main>
+
+                {modalState.type === ModalType.BOOKING && (
+                    <BookingModal 
+                        isOpen={true}
+                        onClose={() => setModalState({ type: ModalType.DAY_DETAILS, data: modalState.data })}
+                        onSave={handleSaveBooking}
+                        bookingData={modalState.data.booking}
+                        date={modalState.data.date}
+                        timeSlot={modalState.data.timeSlot}
+                    />
+                )}
+
+                {modalState.type === ModalType.DAY_DETAILS && (
+                    <DayDetailModal
+                        isOpen={true}
+                        onClose={handleCloseModal}
+                        date={modalState.data.date}
+                        bookings={selectedDayBookings}
+                        onBookSlot={(timeSlot) => handleOpenModal(ModalType.BOOKING, { date: modalState.data.date, timeSlot })}
+                        onEditBooking={(booking) => {
+                            const timeSlot = TIME_SLOTS.find(ts => ts.id === booking.timeSlotId);
+                            handleOpenModal(ModalType.BOOKING, { date: booking.date, timeSlot, booking })
+                        }}
+                    />
+                )}
+            </div>
+        </>
+    );
+};
+// --- END OF App.tsx ---
+
+// --- START OF index.tsx ---
+const rootElement = document.getElementById('root');
+if (!rootElement) {
+  throw new Error("Could not find root element to mount to");
+}
+
+const root = ReactDOM.createRoot(rootElement);
+root.render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);
+// --- END OF index.tsx ---
+    </script>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>
